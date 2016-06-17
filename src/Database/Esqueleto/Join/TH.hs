@@ -50,8 +50,8 @@ mkInstances = fmap concat . mapM (uncurry joinInstance)
   where
     joinInstance (lType, lCons) (rType, rCons) =
       [d|
-        instance Join $(conT lType) $(conT rType) where
-          join l r = E.on (l E.^. $(conE lCons) E.==. r E.^. $(conE rCons))
+        instance JoinPair $(conT lType) $(conT rType) where
+          joinPair l r = E.on (l E.^. $(conE lCons) E.==. r E.^. $(conE rCons))
       |]
 
 entityFieldInstances :: Q [Dec]

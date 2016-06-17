@@ -10,16 +10,16 @@ type family JoinsInternal (a :: [*]) (b :: *) :: * where
   JoinsInternal '[a] acc = InnerJoin acc (SqlExpr (Entity a))
   JoinsInternal (a ': rest) acc = JoinsInternal rest (InnerJoin acc (SqlExpr (Entity a)))
 
-class Join a b where
-  join :: SqlExpr (Entity a) -> SqlExpr (Entity b) -> SqlQuery ()
+class JoinPair a b where
+  joinPair :: SqlExpr (Entity a) -> SqlExpr (Entity b) -> SqlQuery ()
 
-class Joiner a where
-  joiner :: a -> SqlQuery ()
-instance Join a b => Joiner (SqlExpr (Entity a) `InnerJoin` SqlExpr (Entity b)) where
-  joiner (a `InnerJoin` b) = join a b
+class Join a where
+  join :: a -> SqlQuery ()
+instance JoinPair a b => Join (SqlExpr (Entity a) `InnerJoin` SqlExpr (Entity b)) where
+  join (a `InnerJoin` b) = joinPair a b
 instance
-  (Join a b, Joiner (SqlExpr (Entity b) `InnerJoin` c)) =>
-  Joiner (SqlExpr (Entity a) `InnerJoin` SqlExpr (Entity b) `InnerJoin` c) where
-  joiner (a `InnerJoin` b `InnerJoin` c) = do
-    joiner $ b `InnerJoin` c
-    join a b
+  (JoinPair a b, Join (SqlExpr (Entity b) `InnerJoin` c)) =>
+  Join (SqlExpr (Entity a) `InnerJoin` SqlExpr (Entity b) `InnerJoin` c) where
+  join (a `InnerJoin` b `InnerJoin` c) = do
+    join $ b `InnerJoin` c
+    joinPair a b
