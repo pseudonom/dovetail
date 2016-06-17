@@ -1,6 +1,6 @@
 {-# LANGUAGE TemplateHaskell #-}
 
-module TH where
+module Database.Esqueleto.Join.TH where
 
 import qualified Data.List as List
 import Data.Maybe
@@ -9,7 +9,7 @@ import Data.Tuple
 import qualified Database.Esqueleto as E
 import Language.Haskell.TH
 
-import Lib
+import Database.Esqueleto.Join
 
 (<$$>) :: (Functor f, Functor g) => (a -> b) -> f (g a) -> f (g b)
 f <$$> a = (f <$>) <$> a

@@ -1,5 +1,6 @@
 {-# LANGUAGE UndecidableInstances #-}
-module Lib where
+
+module Database.Esqueleto.Join where
 
 import Database.Esqueleto
 

@@ -3,7 +3,7 @@ module Main where
 import ClassyPrelude
 import Database.Esqueleto
 
-import Lib
+import Database.Esqueleto.Join
 import Ents
 
 main :: IO ()
