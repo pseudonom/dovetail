@@ -3,6 +3,7 @@
 module Database.Esqueleto.Join.TH where
 
 import qualified Data.List as List
+import qualified Data.List.Extra as List
 import Data.Maybe
 import Data.Monoid
 import Data.Tuple
@@ -19,16 +20,13 @@ type FieldOutType = Name
 type Constructor = Name
 
 mkJoins :: Q [Dec]
-mkJoins = mkInstances . findPairings =<< getEntityFields
+mkJoins = mkInstances . findPairings . pluck =<< entityFieldInstances
 
-getEntityFields :: Q [(EntityType, [(FieldOutType, Constructor)])]
-getEntityFields = (\i -> (entityType i, catMaybes $ fieldKeyCons <$> entityFieldConstructors i)) <$$> entityFieldInstances
+pluck :: [Dec] -> [(EntityType, [(FieldOutType, Constructor)])]
+pluck = map (\i -> (entityType i, catMaybes $ fieldKeyCons <$> entityFieldConstructors i))
 
 pairs :: [a] -> [(a, a)]
-pairs xs = do
-  a <- xs
-  b <- xs
-  pure (a, b)
+pairs xs = (,) <$> xs <*> xs
 
 -- | Find pairs of entities with a unique way of joining
 findPairings
@@ -43,7 +41,7 @@ findPairings xs =
           ([lCon], [rCon]) -> Just ((leftT, lCon), (rightT, rCon))
           _ -> Nothing
         where
-          cons t = fmap snd . filter ((== t) . fst)
+          cons t = fmap snd . filter ((== show t) . show . fst)
 
 mkInstances :: [((EntityType, Constructor), (EntityType, Constructor))] -> Q [Dec]
 mkInstances = fmap concat . mapM (uncurry joinInstance)
@@ -64,9 +62,10 @@ entityType _ = error "`EntityField` not returning `DataInstD`"
 entityFieldConstructors :: Dec -> [Con]
 entityFieldConstructors (DataInstD _ _ _ cons _) = cons
 entityFieldConstructors _ = error "`EntityField` not returning `DataInstD`"
-
 fieldKeyCons :: Con -> Maybe (Name, Name)
 fieldKeyCons (ForallC [] [AppT _ (AppT (ConT k) (ConT ty))] (NormalC con _))
   | k == ''E.Key = Just (ty, con)
   | otherwise = Nothing
+fieldKeyCons (ForallC [] [AppT _ (ConT ty)] (NormalC con _)) =
+  (, con) . mkName <$> "Id" `List.stripSuffix` show ty
 fieldKeyCons _ = Nothing

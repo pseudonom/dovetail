@@ -18,12 +18,14 @@ library
                      , Database.Esqueleto.Join.TH
   build-depends:       base >= 4.7 && < 5
                      , esqueleto
+                     , extra
                      , template-haskell
   default-extensions:  DataKinds
                      , FlexibleInstances
                      , KindSignatures
                      , MultiParamTypeClasses
                      , TemplateHaskell
+                     , TupleSections
                      , TypeFamilies
                      , TypeOperators
   default-language:    Haskell2010
