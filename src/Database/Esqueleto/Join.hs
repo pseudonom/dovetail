@@ -23,3 +23,9 @@ instance
   join (a `InnerJoin` b `InnerJoin` c) = do
     join $ b `InnerJoin` c
     joinPair a b
+instance
+  (JoinPair a b, Join (SqlExpr (Entity b) `InnerJoin` c `InnerJoin` d)) =>
+  Join (SqlExpr (Entity a) `InnerJoin` SqlExpr (Entity b) `InnerJoin` c `InnerJoin` d) where
+  join (a `InnerJoin` b `InnerJoin` c `InnerJoin` d) = do
+    join $ b `InnerJoin` c `InnerJoin` d
+    joinPair a b
