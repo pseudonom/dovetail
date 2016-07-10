@@ -3,7 +3,6 @@
 module Database.Esqueleto.Join.TH where
 
 import qualified Data.List as List
-import qualified Data.List.Extra as List
 import Data.Maybe
 import Data.Monoid
 import Data.Tuple
@@ -72,5 +71,8 @@ fieldKeyConstructors (ForallC [] [AppT _ (AppT (ConT k) ty)] con)
   | k == ''E.Key = Just (ty, con)
   | otherwise = Nothing
 fieldKeyConstructors (ForallC [] [AppT _ (ConT ty)] con) =
-  (, con) . ConT . mkName <$> "Id" `List.stripSuffix` show ty
+  (, con) . ConT . mkName <$> "Id" `stripSuffix` show ty
 fieldKeyConstructors _ = Nothing
+
+stripSuffix :: Eq a => [a] -> [a] -> Maybe [a]
+stripSuffix xs ys = reverse <$> List.stripPrefix (reverse xs) (reverse ys)
