@@ -21,6 +21,7 @@ library
                      , extra
                      , template-haskell
   default-extensions:  DataKinds
+                     , FlexibleContexts
                      , FlexibleInstances
                      , KindSignatures
                      , MultiParamTypeClasses

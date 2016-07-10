@@ -18,14 +18,12 @@ class Join a where
 instance JoinPair a b => Join (SqlExpr (Entity a) `InnerJoin` SqlExpr (Entity b)) where
   join (a `InnerJoin` b) = joinPair a b
 instance
-  (JoinPair a b, Join (SqlExpr (Entity b) `InnerJoin` c)) =>
-  Join (SqlExpr (Entity a) `InnerJoin` SqlExpr (Entity b) `InnerJoin` c) where
-  join (a `InnerJoin` b `InnerJoin` c) = do
-    join $ b `InnerJoin` c
-    joinPair a b
-instance
-  (JoinPair a b, Join (SqlExpr (Entity b) `InnerJoin` c `InnerJoin` d)) =>
-  Join (SqlExpr (Entity a) `InnerJoin` SqlExpr (Entity b) `InnerJoin` c `InnerJoin` d) where
-  join (a `InnerJoin` b `InnerJoin` c `InnerJoin` d) = do
-    join $ b `InnerJoin` c `InnerJoin` d
-    joinPair a b
+  (Join (a `InnerJoin` SqlExpr (Entity b)), JoinPair b c) =>
+  Join (a `InnerJoin` SqlExpr (Entity b) `InnerJoin` SqlExpr (Entity c)) where
+  join xs =
+    joinPair l r *> join rest
+    where
+      (rest, l, r) = split xs
+
+split :: a `InnerJoin` b `InnerJoin` c -> (a `InnerJoin` b, b, c)
+split (a `InnerJoin` b `InnerJoin` c) = (a `InnerJoin` b, b, c)
