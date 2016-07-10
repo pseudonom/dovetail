@@ -15,15 +15,15 @@ import Database.Esqueleto.Join
 (<$$>) :: (Functor f, Functor g) => (a -> b) -> f (g a) -> f (g b)
 f <$$> a = (f <$>) <$> a
 
-type EntityType = Name
-type FieldOutType = Name
-type Constructor = Name
+type EntityType = Type
+type FieldOutType = Type
+type Constructor = Con
 
 mkJoins :: Q [Dec]
 mkJoins = mkInstances . findPairings . pluck =<< entityFieldInstances
 
 pluck :: [Dec] -> [(EntityType, [(FieldOutType, Constructor)])]
-pluck = map (\i -> (entityType i, catMaybes $ fieldKeyCons <$> entityFieldConstructors i))
+pluck = map (\i -> (entityType i, catMaybes $ fieldKeyConstructors <$> entityFieldConstructors i))
 
 pairs :: [a] -> [(a, a)]
 pairs xs = (,) <$> xs <*> xs
@@ -41,31 +41,36 @@ findPairings xs =
           ([lCon], [rCon]) -> Just ((leftT, lCon), (rightT, rCon))
           _ -> Nothing
         where
-          cons t = fmap snd . filter ((== show t) . show . fst)
+          cons t = fmap snd . filter ((== t) . fst)
 
 mkInstances :: [((EntityType, Constructor), (EntityType, Constructor))] -> Q [Dec]
 mkInstances = fmap concat . mapM (uncurry joinInstance)
   where
     joinInstance (lType, lCons) (rType, rCons) =
       [d|
-        instance JoinPair $(conT lType) $(conT rType) where
-          joinPair l r = E.on (l E.^. $(conE lCons) E.==. r E.^. $(conE rCons))
+        instance JoinPair $(pure lType) $(pure rType) where
+          joinPair l r = E.on (l E.^. $(mkCon lCons) E.==. r E.^. $(mkCon rCons))
       |]
+    mkCon (NormalC name _) = conE name
+    mkCon _ = error "Field key doesn't use a normal constructor"
 
 entityFieldInstances :: Q [Dec]
 entityFieldInstances = do
   FamilyI _ instances <- reify $ mkName "EntityField"
   pure instances
-entityType :: Dec -> Name
-entityType (DataInstD _ _ [ConT ty, _] _ _) = ty
+
+entityType :: Dec -> Type
+entityType (DataInstD _ _ [ty, _] _ _) = ty
 entityType _ = error "`EntityField` not returning `DataInstD`"
-entityFieldConstructors :: Dec -> [Con]
+
+entityFieldConstructors :: Dec -> [Constructor]
 entityFieldConstructors (DataInstD _ _ _ cons _) = cons
 entityFieldConstructors _ = error "`EntityField` not returning `DataInstD`"
-fieldKeyCons :: Con -> Maybe (Name, Name)
-fieldKeyCons (ForallC [] [AppT _ (AppT (ConT k) (ConT ty))] (NormalC con _))
+
+fieldKeyConstructors :: Constructor -> Maybe (Type, Constructor)
+fieldKeyConstructors (ForallC [] [AppT _ (AppT (ConT k) ty)] con)
   | k == ''E.Key = Just (ty, con)
   | otherwise = Nothing
-fieldKeyCons (ForallC [] [AppT _ (ConT ty)] (NormalC con _)) =
-  (, con) . mkName <$> "Id" `List.stripSuffix` show ty
-fieldKeyCons _ = Nothing
+fieldKeyConstructors (ForallC [] [AppT _ (ConT ty)] con) =
+  (, con) . ConT . mkName <$> "Id" `List.stripSuffix` show ty
+fieldKeyConstructors _ = Nothing
