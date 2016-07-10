@@ -13,6 +13,11 @@ Teacher
   schoolId SchoolId
 Student
   teacherId TeacherId
+Pencil
+  studentId StudentId
+TwoKeys
+  studentId1 StudentId
+  studentId2 StudentId
 |]
 
 mkJoins
