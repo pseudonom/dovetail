@@ -34,7 +34,7 @@ library
 test-suite dovetail-test
   type:                exitcode-stdio-1.0
   hs-source-dirs:      test
-  main-is:             Main.hs
+  main-is:             Spec.hs
   other-modules:       Ents
   build-depends:       base
                      , dovetail

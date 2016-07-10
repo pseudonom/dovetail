@@ -1,4 +1,4 @@
-module Main where
+module Spec where
 
 import ClassyPrelude.Yesod hiding (Proxy, join)
 import Control.Monad.Logger
