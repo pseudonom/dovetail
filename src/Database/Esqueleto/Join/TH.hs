@@ -8,6 +8,7 @@ import Data.Monoid
 import Data.Tuple
 import qualified Database.Esqueleto as E
 import Language.Haskell.TH
+import Language.Haskell.TH.ExpandSyns
 
 import Database.Esqueleto.Join
 
@@ -19,10 +20,10 @@ type FieldOutType = Type
 type Constructor = Con
 
 mkJoins :: Q [Dec]
-mkJoins = mkInstances . findPairings . pluck =<< entityFieldInstances
+mkJoins = mkInstances . findPairings =<< mapM pluck =<< entityFieldInstances
 
-pluck :: [Dec] -> [(EntityType, [(FieldOutType, Constructor)])]
-pluck = map (\i -> (entityType i, catMaybes $ fieldKeyConstructors <$> entityFieldConstructors i))
+pluck :: Dec -> Q (EntityType, [(FieldOutType, Constructor)])
+pluck dec = (entityType dec, ) . catMaybes <$> mapM fieldKeyConstructors (entityFieldConstructors dec)
 
 pairs :: [a] -> [(a, a)]
 pairs xs = (,) <$> xs <*> xs
@@ -55,7 +56,7 @@ mkInstances = fmap concat . mapM (uncurry joinInstance)
 
 entityFieldInstances :: Q [Dec]
 entityFieldInstances = do
-  FamilyI _ instances <- reify $ mkName "EntityField"
+  FamilyI _ instances <- reify ''E.EntityField
   pure instances
 
 entityType :: Dec -> Type
@@ -66,13 +67,15 @@ entityFieldConstructors :: Dec -> [Constructor]
 entityFieldConstructors (DataInstD _ _ _ cons _) = cons
 entityFieldConstructors _ = error "`EntityField` not returning `DataInstD`"
 
-fieldKeyConstructors :: Constructor -> Maybe (Type, Constructor)
-fieldKeyConstructors (ForallC [] [AppT _ (AppT (ConT k) ty)] con)
-  | k == ''E.Key = Just (ty, con)
-  | otherwise = Nothing
-fieldKeyConstructors (ForallC [] [AppT _ (ConT ty)] con) =
-  (, con) . ConT . mkName <$> "Id" `stripSuffix` show ty
-fieldKeyConstructors _ = Nothing
-
-stripSuffix :: Eq a => [a] -> [a] -> Maybe [a]
-stripSuffix xs ys = reverse <$> List.stripPrefix (reverse xs) (reverse ys)
+fieldKeyConstructors :: Constructor -> Q (Maybe (Type, Constructor))
+fieldKeyConstructors con = do
+  case con of
+    (ForallC [] [AppT _equalityT ty@(ConT _)] con) ->
+      fmap (, con) . extractType <$> expandSyns ty
+    (ForallC [] [AppT _equalityT ty] con) ->
+      pure . fmap (, con) $ extractType ty
+    _ -> pure Nothing
+  where
+    extractType (AppT (ConT k) ty)
+      | k == ''E.Key = Just ty
+    extractType _ = Nothing

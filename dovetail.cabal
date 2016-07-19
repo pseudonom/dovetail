@@ -19,6 +19,7 @@ library
   build-depends:       base >= 4.7 && < 5
                      , esqueleto
                      , template-haskell
+                     , th-expand-syns
   default-extensions:  DataKinds
                      , FlexibleContexts
                      , FlexibleInstances
