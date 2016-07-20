@@ -1,9 +1,7 @@
-module Spec where
+module Main where
 
 import ClassyPrelude.Yesod hiding (Proxy, join)
 import Control.Monad.Logger
-import Data.Maybe
-import Data.Proxy
 import Database.Esqueleto
 import Database.Persist.Sqlite
 
@@ -25,8 +23,10 @@ three =
     join ents
     return student
 
+type SEnt a = SqlExpr (Entity a)
+
 four :: MonadIO m => ReaderT SqlBackend m [Entity Pencil]
 four =
-  select . from $ \(ents@(_ `InnerJoin` _ `InnerJoin` _ `InnerJoin` pencil) :: Joins [School, Teacher, Student, Pencil]) -> do
+  select . from $ \ents@((_ :: SEnt School) `InnerJoin` (_ :: SEnt Teacher) `LeftOuterJoin` (_ :: SEnt Student) `LeftOuterJoin` pencil) -> do
     join ents
     return pencil
