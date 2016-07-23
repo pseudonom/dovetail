@@ -1,4 +1,4 @@
-module Main where
+module Spec where
 
 import ClassyPrelude.Yesod hiding (Proxy, join)
 import Control.Monad.Logger
@@ -6,13 +6,19 @@ import Database.Esqueleto
 import Database.Persist.Sqlite
 
 import Database.Esqueleto.Join
-import Ents
+
+import Ents1
+import Ents2
+import Ents3
 
 main :: IO ()
 main =
   runStderrLoggingT . withSqliteConn ":memory:" $ \backend ->
     flip runSqlConn backend $ do
-      runMigration migrateAll
+      runMigration $ do
+        Ents1.migrateAll
+        Ents2.migrateAll
+        Ents3.migrateAll
       void three
       void four
 

@@ -70,15 +70,13 @@ entityFieldConstructors :: Dec -> [Constructor]
 entityFieldConstructors (DataInstD _ _ _ cons _) = cons
 entityFieldConstructors _ = error "`EntityField` not returning `DataInstD`"
 
-fieldKeyConstructors :: Constructor -> Q (Maybe (Type, Constructor))
+fieldKeyConstructors :: Constructor -> Q (Maybe (EntityType, Constructor))
 fieldKeyConstructors con =
   case con of
-    (ForallC [] [AppT _equalityT ty@(ConT _)] con') ->
-      fmap (, con') . extractType <$> expandSyns ty
     (ForallC [] [AppT _equalityT ty] con') ->
-      pure . fmap (, con') $ extractType ty
+      ((, con') <$$>) . traverse expandSyns . extractEntityType =<< expandSyns ty
     _ -> pure Nothing
   where
-    extractType (AppT (ConT k) ty)
+    extractEntityType (AppT (ConT k) ty)
       | k == ''E.Key = Just ty
-    extractType _ = Nothing
+    extractEntityType _ = Nothing
