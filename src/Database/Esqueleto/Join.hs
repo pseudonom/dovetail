@@ -1,9 +1,19 @@
 {-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 
 module Database.Esqueleto.Join where
 
+import Data.Singletons.TH
 import Database.Esqueleto
+import Prelude
+
+$(singletons [d|
+  data MaybeCon = Present | Absent deriving (Eq, Show)
+ |])
+
+type family MaybeMaybe (a :: MaybeCon) (b :: *) :: * where
+  MaybeMaybe 'Present b = Maybe b
+  MaybeMaybe 'Absent b = b
+
 
 type family Joins (a :: [*]) :: * where
   Joins (a ': rest) = JoinsInternal rest (SqlExpr (Entity a))
@@ -11,9 +21,14 @@ type family JoinsInternal (a :: [*]) (b :: *) :: * where
   JoinsInternal '[a] acc = InnerJoin acc (SqlExpr (Entity a))
   JoinsInternal (a ': rest) acc = JoinsInternal rest (InnerJoin acc (SqlExpr (Entity a)))
 
-class FieldPair a b where
+type PairSig a b c d =
+  ( (SMaybeCon c, EntityField a (MaybeMaybe c (JoinKey a b)))
+  , (SMaybeCon d, EntityField b (MaybeMaybe d (JoinKey a b)))
+  )
+
+class FieldPair a b c d | a b -> c, a b -> d where
   type JoinKey a b
-  pair :: (EntityField a (JoinKey a b), EntityField b (JoinKey a b))
+  pair :: PairSig a b c d
 
 class Split join where
   split :: a `join` b -> (a, b)
@@ -37,26 +52,54 @@ split3 abc =
 
 class JoinPair a b where
   joinPair :: SqlExpr a -> SqlExpr b -> SqlQuery ()
-instance (FieldPair a b, PersistField (JoinKey a b), PersistEntity a, PersistEntity b) => JoinPair (Entity a) (Entity b) where
+
+instance (FieldPair a b c d, PersistField (JoinKey a b), PersistEntity a, PersistEntity b) => JoinPair (Entity a) (Entity b) where
   joinPair a b =
-    on (a ^. aField ==. b ^. bField)
+    on condition
       where
-        (aField, bField) = pair
-instance (FieldPair a b, PersistField (JoinKey a b), PersistEntity a, PersistEntity b) => JoinPair (Maybe (Entity a)) (Maybe (Entity b)) where
+        ((aMC, aField), (bMC, bField)) = pair :: PairSig a b c d
+        condition =
+          case (aMC, bMC) of
+            (SAbsent, SAbsent) -> a ^. aField ==. b ^. bField
+            (SPresent, SPresent) -> a ^. aField ==. b ^. bField
+            (SPresent, SAbsent) -> a ^. aField ==. just (b ^. bField)
+            (SAbsent, SPresent) -> just (a ^. aField) ==. b ^. bField
+
+instance (FieldPair a b c d, PersistField (JoinKey a b), PersistEntity a, PersistEntity b) => JoinPair (Maybe (Entity a)) (Maybe (Entity b)) where
   joinPair a b =
-    on (a ?. aField ==. b ?. bField)
+    on condition
       where
-        (aField, bField) = pair
-instance (FieldPair a b, PersistField (JoinKey a b), PersistEntity a, PersistEntity b) => JoinPair (Entity a) (Maybe (Entity b)) where
+        ((aMC, aField), (bMC, bField)) = pair :: PairSig a b c d
+        condition =
+          case (aMC, bMC) of
+            (SAbsent, SAbsent) -> a ?. aField ==. b ?. bField
+            (SPresent, SPresent) -> a ?. aField ==. b ?. bField
+            (SPresent, SAbsent) -> a ?. aField ==. just (b ?. bField)
+            (SAbsent, SPresent) -> just (a ?. aField) ==. b ?. bField
+
+instance (FieldPair a b c d, PersistField (JoinKey a b), PersistEntity a, PersistEntity b) => JoinPair (Entity a) (Maybe (Entity b)) where
   joinPair a b =
-    on (just (a ^. aField) ==. b ?. bField)
+    on condition
       where
-        (aField, bField) = pair
-instance (FieldPair a b, PersistField (JoinKey a b), PersistEntity a, PersistEntity b) => JoinPair (Maybe (Entity a)) (Entity b) where
+        ((aMC, aField), (bMC, bField)) = pair :: PairSig a b c d
+        condition =
+          case (aMC, bMC) of
+            (SAbsent, SAbsent) -> just (a ^. aField) ==. b ?. bField
+            (SPresent, SPresent) -> just (a ^. aField) ==. b ?. bField
+            (SPresent, SAbsent) -> a ^. aField ==. b ?. bField
+            (SAbsent, SPresent) -> just (just (a ^. aField)) ==. b ?. bField
+
+instance (FieldPair a b c d, PersistField (JoinKey a b), PersistEntity a, PersistEntity b) => JoinPair (Maybe (Entity a)) (Entity b) where
   joinPair a b =
-    on (a ?. aField ==. just (b ^. bField))
-     where
-       (aField, bField) = pair
+    on condition
+      where
+        ((aMC, aField), (bMC, bField)) = pair :: PairSig a b c d
+        condition =
+          case (aMC, bMC) of
+            (SAbsent, SAbsent) -> a ?. aField ==. just (b ^. bField)
+            (SPresent, SPresent) -> a ?. aField ==. just (b ^. bField)
+            (SPresent, SAbsent) -> a ?. aField ==. just (just (b ^. bField))
+            (SAbsent, SPresent) -> a ?. aField ==. b ^. bField
 
 class Join a where
   join :: a -> SqlQuery ()

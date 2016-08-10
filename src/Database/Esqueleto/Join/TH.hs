@@ -21,7 +21,7 @@ type Constructor = Con
 mkJoins :: Q [Dec]
 mkJoins = mkInstances . findPairings =<< mapM pluck =<< entityFieldInstances
 
-pluck :: Dec -> Q (EntityType, [(FieldOutType, Constructor)])
+pluck :: Dec -> Q (EntityType, [(FieldOutType, Constructor, MaybeCon)])
 pluck dec = (entityType dec, ) . catMaybes <$> mapM fieldKeyConstructors (entityFieldConstructors dec)
 
 pairs :: [a] -> [(a, a)]
@@ -29,8 +29,8 @@ pairs xs = (,) <$> xs <*> xs
 
 -- | Find pairs of entities with a unique way of joining
 findPairings
-  :: [(EntityType, [(FieldOutType, Constructor)])]
-  -> [((EntityType, Constructor), (EntityType, Constructor), FieldOutType)]
+  :: [(EntityType, [(FieldOutType, Constructor, MaybeCon)])]
+  -> [((EntityType, Constructor, MaybeCon), (EntityType, Constructor, MaybeCon), FieldOutType)]
 findPairings xs =
   symmetrize . catMaybes $ uncurry handlePair <$> pairs xs
     where
@@ -39,21 +39,33 @@ findPairings xs =
           swap (l, r, f) = (r, l, f)
       handlePair (leftT, leftCons) (rightT, rightCons) =
         case (cons leftT leftCons, cons leftT rightCons) of
-          ([lCon], [rCon]) -> Just ((leftT, lCon), (rightT, rCon), AppT (ConT ''E.Key) leftT)
+          ([(lCon, lMC)], [(rCon, rMC)])
+            | not (lMC == Present && rMC == Present) -- It doesn't make much sense for the primary key to be nullable
+            -> Just ((leftT, lCon, lMC), (rightT, rCon, rMC), AppT (ConT ''E.Key) leftT)
           _ -> Nothing
         where
-          cons t = fmap snd . filter ((== t) . fst)
+          cons :: EntityType -> [(FieldOutType, Constructor, MaybeCon)] -> [(Constructor, MaybeCon)]
+          cons t = map (\(_, c, mc) -> (c, mc)) . filter ((== t) . fst3)
+          fst3 (a, _, _) = a
 
-mkInstances :: [((EntityType, Constructor), (EntityType, Constructor), FieldOutType)] -> Q [Dec]
+mkInstances :: [((EntityType, Constructor, MaybeCon), (EntityType, Constructor, MaybeCon), FieldOutType)] -> Q [Dec]
 mkInstances = fmap concat . mapM (uncurry3 joinInstance)
   where
     uncurry3 f (a, b, c) = f a b c
-    joinInstance (lType, lCons) (rType, rCons) fieldType =
+    joinInstance (lType, lCons, lMC) (rType, rCons, rMC) fieldType =
       [d|
-        instance FieldPair $(pure lType) $(pure rType) where
+        instance FieldPair $(pure lType) $(pure rType) $(pure $ promote lMC) $(pure $ promote rMC) where
           type JoinKey $(pure lType) $(pure rType) = $(pure fieldType)
-          pair = ($(mkCon lCons), $(mkCon rCons))
+          pair =
+            ( ($(singlize lMC), $(mkCon lCons))
+            , ($(singlize rMC), $(mkCon rCons))
+            )
       |]
+        where
+          promote Present = PromotedT 'Present
+          promote Absent = PromotedT 'Absent
+          singlize Present = [|SPresent|]
+          singlize Absent = [|SAbsent|]
     mkCon (NormalC name _) = conE name
     mkCon _ = error "Field key doesn't use a normal constructor"
 
@@ -70,13 +82,17 @@ entityFieldConstructors :: Dec -> [Constructor]
 entityFieldConstructors (DataInstD _ _ _ cons _) = cons
 entityFieldConstructors _ = error "`EntityField` not returning `DataInstD`"
 
-fieldKeyConstructors :: Constructor -> Q (Maybe (EntityType, Constructor))
+fieldKeyConstructors :: Constructor -> Q (Maybe (FieldOutType, Constructor, MaybeCon))
 fieldKeyConstructors con =
   case con of
     (ForallC [] [AppT _equalityT ty] con') ->
-      ((, con') <$$>) . traverse expandSyns . extractEntityType =<< expandSyns ty
+      ((\(ty', mc) -> (ty', con', mc)) <$$>) . expandSyns' . extractEntityType =<< expandSyns ty
     _ -> pure Nothing
   where
+    expandSyns' (Just (ty, con')) = Just . (, con') <$> expandSyns ty
+    expandSyns' Nothing = pure Nothing
     extractEntityType (AppT (ConT k) ty)
-      | k == ''E.Key = Just ty
+      | k == ''E.Key = Just (ty, Absent)
+    extractEntityType (AppT (ConT m) (AppT (ConT k) ty))
+      | m == ''Maybe && k == ''E.Key = Just (ty, Present)
     extractEntityType _ = Nothing

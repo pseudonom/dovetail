@@ -7,6 +7,6 @@ import ClassyPrelude.Yesod
 share [mkPersist sqlSettings{ mpsGenerateLenses = True }, mkMigrate "migrateAll"] [persistLowerCase|
 School
 Teacher
-  schoolId (Key School)
+  schoolId (Key School) Maybe
 |]
 type Teacher1 = Teacher

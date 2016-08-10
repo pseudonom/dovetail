@@ -1,4 +1,4 @@
-module Spec where
+module Main where
 
 import ClassyPrelude.Yesod hiding (Proxy, join)
 import Control.Monad.Logger
@@ -31,8 +31,8 @@ three =
 
 type SEnt a = SqlExpr (Entity a)
 
-four :: MonadIO m => ReaderT SqlBackend m [Entity Pencil]
+four :: MonadIO m => ReaderT SqlBackend m [Maybe (Entity Pencil)]
 four =
-  select . from $ \ents@((_ :: SEnt School) `InnerJoin` (_ :: SEnt Teacher) `LeftOuterJoin` (_ :: SEnt Student) `LeftOuterJoin` pencil) -> do
+  select . from $ \ents@((_ :: SEnt School) `InnerJoin` (_ :: SEnt Teacher) `LeftOuterJoin` (_ :: SqlExpr (Maybe (Entity Student))) `LeftOuterJoin` pencil) -> do
     join ents
     return pencil

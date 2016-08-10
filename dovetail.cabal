@@ -18,13 +18,17 @@ library
                      , Database.Esqueleto.Join.TH
   build-depends:       base >= 4.7 && < 5
                      , esqueleto
+                     , singletons
                      , template-haskell
                      , th-expand-syns
   default-extensions:  DataKinds
                      , FlexibleContexts
                      , FlexibleInstances
+                     , FunctionalDependencies
+                     , GADTs
                      , KindSignatures
                      , MultiParamTypeClasses
+                     , ScopedTypeVariables
                      , TemplateHaskell
                      , TupleSections
                      , TypeFamilies
