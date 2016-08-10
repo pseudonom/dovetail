@@ -19,6 +19,7 @@ library
   build-depends:       base >= 4.7 && < 5
                      , esqueleto
                      , singletons
+                     , tagged
                      , template-haskell
                      , th-expand-syns
   default-extensions:  DataKinds
@@ -28,11 +29,13 @@ library
                      , GADTs
                      , KindSignatures
                      , MultiParamTypeClasses
+                     , RecordWildCards
                      , ScopedTypeVariables
                      , TemplateHaskell
                      , TupleSections
                      , TypeFamilies
                      , TypeOperators
+                     , ViewPatterns
   default-language:    Haskell2010
 
 test-suite dovetail-test
